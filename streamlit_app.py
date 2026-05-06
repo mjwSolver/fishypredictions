@@ -155,6 +155,18 @@ with tab2:
     
     ## 5️⃣ Evaluation
     - MAE: 44.5g, R²: 0.967 (96.7% variance explained)
+    
+    ## 6️⃣ Deployment & Real-World Applications
+    **Use Cases:**
+    - **Fisheries Management**: Estimate stock biomass without sacrificing fish for weighing
+    - **Aquaculture Monitoring**: Track growth rates of farmed fish over time
+    - **Climate Impact Studies**: Compare fish sizes across years to detect environmental changes
+    - **Market Pricing**: Provide fair prices based on accurate weight estimates
+    
+    **Longitudinal Analysis**: By collecting measurements annually, researchers can:
+    - Track growth trends across seasons/generations
+    - Identify environmental pressure changes (temperature, food availability)
+    - Detect anomalies in fish development patterns
     """)
 
 with tab3:
