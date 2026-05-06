@@ -89,6 +89,18 @@ with tab2:
     ax3.set_title('Length3 vs Weight by Species')
     ax3.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     
+    # Weight variance by species (bar chart)
+    ax4 = axes[1, 1]
+    weight_variance = df.groupby('Species')['Weight'].var().sort_values(ascending=True)
+    bars = ax4.barh(weight_variance.index, weight_variance.values, color='steelblue', alpha=0.7)
+    ax4.set_xlabel('Weight Variance (g²)')
+    ax4.set_ylabel('Species')
+    ax4.set_title('Weight Variance by Species')
+    # Add value labels on bars
+    for bar, val in zip(bars, weight_variance.values):
+        ax4.text(bar.get_width() + 5000, bar.get_y() + bar.get_height()/2, 
+                f'{val:.0f}', va='center', fontsize=8)
+    
     plt.tight_layout()
     st.pyplot(fig)
     
@@ -102,6 +114,15 @@ with tab2:
     
     st.markdown("""
     ## 3️⃣ Data Preparation
+    
+    ### Feature Analysis
+    The three length measurements help capture different body proportions:
+    - **Length1, Length2, Length3**: Multiple linear dimensions for robust volume estimation
+    - **Length3** has highest correlation with Weight (0.923)
+    - **Height, Width**: Cross-sectional dimensions
+    
+    Note: The exact measurement protocol isn't documented in the Kaggle source.
+    
     | Issue | Action |
     |-------|--------|
     | Zero weight | Kept - model learns near-zero for small fish |
@@ -110,10 +131,27 @@ with tab2:
     | Non-linear | Random Forest |
     
     ## 4️⃣ Modeling
-    **Why Random Forest?**
-    - Non-linear relationships (volume-based weight)
-    - Robust to outliers
-    - No extensive tuning needed
+    
+    ### Why Random Forest?
+    - **Non-linear relationships**: Fish weight scales with volume (L×W×H), not linearly
+    - **Robust to outliers**: Handles measurement errors gracefully
+    - **No extensive tuning**: Works well with default parameters
+    
+    ### Why NOT Linear Regression?
+    - Assumes linear relationships: `Weight = a×Length + b`
+    - Fish volume relationships are cubic: `Volume ∝ L³`
+    - Would underfit - expect much lower R² (~0.7-0.8)
+    
+    ### Why NOT Multiple Linear Regression?
+    - Same issue as above - linear in parameters
+    - Doesn't capture interaction effects between features
+    - Less accurate for biological growth patterns
+    
+    ### Why NOT Support Vector Regression (SVR)?
+    - Good for small datasets but requires careful parameter tuning
+    - Sensitive to feature scaling (we already use StandardScaler)
+    - Slower training, less interpretable feature importance
+    - Risk of overfitting with inappropriate kernel choice
     
     ## 5️⃣ Evaluation
     - MAE: 44.5g, R²: 0.967 (96.7% variance explained)
@@ -136,17 +174,61 @@ with tab3:
     
     if st.button("🔮 Predict Weight"):
         prediction = predict_weight(model, scaler, le, species, length1, length2, length3, height, width)
+        st.session_state['last_prediction'] = prediction
         st.success(f"Predicted Weight: **{prediction:.2f} grams**")
     
     st.divider()
-    st.subheader("📊 Sample Predictions by Species")
-    st.markdown("Average measurements and weights for each species type:")
     
-    species_stats = df.groupby('Species').agg({
-        'Weight': ['mean', 'min', 'max', 'count'],
+    st.subheader("📊 Species Weight Ranges")
+    st.markdown("For each species: minimum, average, and maximum recorded weights")
+    
+    # Get weight ranges for each species
+    weight_ranges = df.groupby('Species').agg({
+        'Weight': ['min', 'mean', 'max'],
         'Length1': 'mean', 'Length2': 'mean', 'Length3': 'mean',
         'Height': 'mean', 'Width': 'mean'
-    }).round(2)
-    species_stats.columns = ['Avg Weight (g)', 'Min', 'Max', 'Count', 
-                              'Avg L1', 'Avg L2', 'Avg L3', 'Avg Height', 'Avg Width']
-    st.dataframe(species_stats.style.format({'Avg Weight (g)': '{:.1f}'}))
+    }).round(1)
+    weight_ranges.columns = ['Min (g)', 'Avg (g)', 'Max (g)', 
+                              'Avg L1', 'Avg L2', 'Avg L3', 'Avg H', 'Avg W']
+    
+    # Display as cards for each species
+    cols = st.columns(3)
+    for idx, (sp, row) in enumerate(weight_ranges.iterrows()):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{sp}**")
+                st.markdown(f"📏 Min: **{row['Min (g)']:.0f}g**")
+                st.markdown(f"📊 Avg: **{row['Avg (g)']:.0f}g**")
+                st.markdown(f"📐 Max: **{row['Max (g)']:.0f}g**")
+                st.caption(f"L3: {row['Avg L3']:.1f}cm | H: {row['Avg H']:.1f}cm")
+    
+    # Show prediction vs range comparison
+    if 'last_prediction' in st.session_state and st.session_state['last_prediction']:
+        st.divider()
+        st.subheader("🎯 Prediction vs Expected Range")
+        selected_sp_data = weight_ranges.loc[species]
+        pred = st.session_state['last_prediction']
+        
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.metric("Your Prediction", f"{pred:.0f}g")
+            avg_diff = pred - selected_sp_data['Avg (g)']
+            if avg_diff >= 0:
+                st.info(f"+{avg_diff:.0f}g from average")
+            else:
+                st.info(f"{avg_diff:.0f}g from average")
+        
+        with col2:
+            min_w = selected_sp_data['Min (g)']
+            max_w = selected_sp_data['Max (g)']
+            if min_w <= pred <= max_w:
+                position = (pred - min_w) / (max_w - min_w)
+                st.progress(position, text=f"Within {species} range: {min_w:.0f}g - {max_w:.0f}g")
+            else:
+                st.warning(f"Outside {species} range ({min_w:.0f}g - {max_w:.0f}g)")
+    
+    st.divider()
+    
+    st.subheader("📈 Detailed Species Statistics")
+    species_stats_display = weight_ranges.drop(columns=['Avg L1', 'Avg L2', 'Avg L3', 'Avg H', 'Avg W'])
+    st.dataframe(species_stats_display.style.format({'Min (g)': '{:.0f}', 'Avg (g)': '{:.0f}', 'Max (g)': '{:.0f}'}))
