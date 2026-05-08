@@ -73,7 +73,7 @@ with tab2:
     ax2 = axes[0, 1]
     numeric_cols = ['Weight', 'Length1', 'Length2', 'Length3', 'Height', 'Width']
     corr_matrix = df[numeric_cols].corr()
-    sns.heatmap(corr_matrix, annot=True, fmt='.2f', cmap='coolwarm', ax=ax2)
+    sns.heatmap(corr_matrix, annot=True, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, ax=ax2)
     ax2.set_title('Feature Correlation Matrix')
     
     # Length vs Weight scatter
@@ -120,6 +120,9 @@ with tab2:
     - **Length1, Length2, Length3**: Multiple linear dimensions for robust volume estimation
     - **Length3** has highest correlation with Weight (0.923)
     - **Height, Width**: Cross-sectional dimensions
+    
+    ### Target Variable
+    The target variable is **Weight**, representing the fish's weight in grams.
     
     Note: The exact measurement protocol isn't documented in the Kaggle source.
     
